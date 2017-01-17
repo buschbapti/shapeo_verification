@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+import rospy
+import actionlib
+from baxter_commander.commander import ArmCommander
+from baxter_commander.persistence import dicttostate
+from shapeo_verification.msg import VerifyInsertionAction
+from shapeo_verification.msg import VerifyInsertionFeedback
+from shapeo_verification.msg import VerifyInsertionResult
+import rospkg
+from os.path import join
+import json
+import numpy as np
+from copy import deepcopy
+from shapeo_verification.srv import *
+
+class VerifyInsertionServer:
+    def __init__(self):
+        self._as = actionlib.SimpleActionServer('verify_insertion', VerifyInsertionAction, self.execute, False)
+        self._as.start()
+        self._feedback = VerifyInsertionFeedback()
+        self._result = VerifyInsertionResult()
+        # get arm configuration from config files
+        rospack = rospkg.RosPack()
+        conf_dir = join(rospack.get_path('shapeo_verification'), 'config')
+        self.sides = ['right', 'left']
+        self.arms = {}
+        self.arm_states = {}
+        for s in self.sides:
+            self.arms[s] = ArmCommander(s)
+            with open(join(conf_dir, s + '_arm_state.json')) as datafile:
+                dict_state = json.load(datafile)
+            self.arm_states[s] = dicttostate(dict_state)
+        self.shape_ids = {}
+        self.init_shape_to_id()
+        # wait for verification server
+        rospy.wait_for_service('verify_shapeo')
+        self.verify_shape_proxy = rospy.ServiceProxy('verify_shapeo', Shapeo)
+
+    def init_shape_to_id(self):
+        self.shape_ids['ellipse'] = 0
+        self.shape_ids['star'] = 1
+        self.shape_ids['trapezium'] = 2
+        self.shape_ids['slice'] = 3
+        self.shape_ids['hexagon'] = 4
+
+    def go_to_state(self, side, state):
+        self.arms[side].move_to_controlled(state)
+
+    def move_to_shape(self, shape_id):
+        # calculate rotation for moving the object
+        state = deepcopy(self.arm_states['right'])
+        state.joint_state.position[state.joint_state.name.index('right_w2')] += (shape_id * (2* np.pi / 5))
+        # move object
+        self.go_to_state('right', state)
+        # move camera
+        self.go_to_state('left', self.arm_states['left'])
+
+    def call_insertion_verification(self, shape_id):
+        verify_res = self.verify_shape_proxy(shape_id)
+        return (verify_res.shapeo_verified.data == 1)
+
+    def execute(self, goal):
+        self._feedback.percent_complete = 0
+        self._as.publish_feedback(self._feedback)
+        shape_id = self.shape_ids[goal.shape]
+        # move the arm to configuration
+        self.move_to_shape(shape_id)
+        self._feedback.percent_complete = 0.5
+        self._as.publish_feedback(self._feedback)
+        # call the service for insertion verification
+        is_inserted = self.call_insertion_verification(shape_id)
+        self._feedback.percent_complete = 1.0
+        self._as.publish_feedback(self._feedback)
+        # send result
+        self._result.is_inserted = is_inserted
+        self._as.set_succeeded(self._result)
+
+
+if __name__ == '__main__':
+    rospy.init_node('verify_insertion_server')
+    server = VerifyInsertionServer()
+    rospy.spin()
