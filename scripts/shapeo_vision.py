@@ -14,17 +14,19 @@ from scipy import ndimage as nd
 #from rotations import compose_rotationZXY, decompose_rotationZXY
 #from quaternion import quaternion_from_matrix
 
+
 MEAN_HUE = 26.0 #hues between MEAN_HUE-HUE_TOL will be accepted
-HUE_TOL  = 3.0
-BB_CUBE = [560,310,1100,590] #Bbox for detecting the cube in the image.
+HUE_TOL  = 4.0
+BB_CUBE = [340,370,700,570] #Bbox for detecting the cube in the image.
 centx_max = 450.0
 centx_min = 70.0
 centy_max = 350.0
 centy_min = 50.0
 general_width = 243.0
-general_height = 100.0
-height_tol = 10#all in pixels
-max_angle = 35#in angles
+general_height = 95.0
+height_tol = 15#all in pixels
+max_angle = 335#in angles
+DEBUGMOD = 0
 
 def get_rotation(shape_id):
     '''
@@ -161,54 +163,72 @@ def verify_toy(shape_id, image_list):
                                :]
             
         #cv_imshow(im_rotated)
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2.png',new_image)
+        if DEBUGMOD:
+            cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2.png',new_image)
         hue_image = cv2.cvtColor(new_image, cv2.cv.CV_BGR2HSV)
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgr.png',hue_image)
+        if DEBUGMOD:
+            cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgr.png',hue_image)
         gray = hue_image[:,:,0]
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgray.png',gray)
+        if DEBUGMOD:
+            cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgray.png',gray)
         gray[gray<MEAN_HUE-HUE_TOL]=0
         gray[gray>MEAN_HUE+HUE_TOL]=0
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraymasked.png',gray)
+        if DEBUGMOD:
+            cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraymasked.png',gray)
         img_proc = median_thres(gray,sigma=7.0)
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraymaskednew.png',img_proc)
+        if DEBUGMOD:
+            cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraymaskednew.png',img_proc)
         grayd = np.uint8(gray*(img_proc/255))
         labeled_array, num_features = nd.label(grayd[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2]])
         hists = nd.histogram(labeled_array, 0, num_features, num_features, labeled_array)
-        objLabel = np.argmax(hists)
-        labeled_array[labeled_array!=objLabel]=0
-        labeled_array[labeled_array==objLabel]=1
-        labeled_array_img=np.uint8(labeled_array*255)
-        #newlabels = gauss_thres(labeled_array_img,sigma=3.0,thres=40.0)
-        newlabels  = deepcopy(labeled_array_img)
-        newlabels[newlabels>0]=1
-        labeled_array = np.uint8(newlabels)
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraylabels.png',labeled_array_img)
-        newmaskedimage = deepcopy(new_image[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2],:])
-        for k in range(3):
-            newmaskedimage[:,:,k] = new_image[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2],k]*labeled_array
-        cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrnewmask.png',newmaskedimage)
-        
-        ret,thresh = cv2.threshold(labeled_array_img,127,255,0)
-        contours,hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        cnt = contours[0]
-        rect = cv2.minAreaRect(cnt)
-        print(rect)
-        centroid = rect[0]
-        dims = rect[1]
-        angle = rect[2]
-        
         verification = 0
         verification_confidence = 0.85
-        larger_dim = np.max(dims)
-        smaller_dim = np.min(dims)
-        ratio = larger_dim/general_width
-        expected_height = ratio*general_height
-        excessive_insertion = expected_height - smaller_dim
-        if centroid[0]<centx_max and centroid[0]>centx_min:
-            if centroid[1]<centy_max and centroid[1]>centy_min:
-                if smaller_dim>expected_height-height_tol and smaller_dim<expected_height+height_tol:
-                    if np.abs(angle)<max_angle:
-                        verification=1
+        excessive_insertion = 10
+        if np.sum(hists)>0:
+            objLabel = np.argmax(hists)
+            labeled_array_temp = deepcopy(labeled_array)
+            labeled_array_temp[labeled_array!=objLabel]=0
+            labeled_array_temp[(labeled_array==objLabel) | (labeled_array==1)]=1
+            labeled_array = deepcopy(labeled_array_temp*(img_proc[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2]]/255.0))
+            labeled_array_img=np.uint8(labeled_array*255)
+            #newlabels = gauss_thres(labeled_array_img,sigma=3.0,thres=40.0)
+            newlabels  = deepcopy(labeled_array_img)
+            newlabels[newlabels>0]=1
+            labeled_array = np.uint8(newlabels)
+            if DEBUGMOD:
+                cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrgraylabels.png',labeled_array_img)
+            newmaskedimage = deepcopy(new_image[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2],:])
+            for k in range(3):
+                newmaskedimage[:,:,k] = new_image[BB_CUBE[1]:BB_CUBE[3],BB_CUBE[0]:BB_CUBE[2],k]*labeled_array
+            if DEBUGMOD:
+                cv2.imwrite('/home/c7031091/Documents/3rdHand/verification/exp1/imgs/obj99_wrong_insertion2huebgrnewmask.png',newmaskedimage)
+            if DEBUGMOD:
+                cv_imshow(newmaskedimage)
+        else:
+            labeled_array_img = 0
+        
+        if np.sum(labeled_array_img)>0:
+            ret,thresh = cv2.threshold(labeled_array_img,127,255,0)
+            contours,hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cnt = contours[0]
+            rect = cv2.minAreaRect(cnt)
+            print('The size of the rectangle: Center, Dimension, Angle:')
+            print(rect)
+            centroid = rect[0]
+            dims = rect[1]
+            angle = rect[2]
+            
+            larger_dim = np.max(dims)
+            smaller_dim = np.min(dims)
+            ratio = larger_dim/general_width
+            ratio = 1.0
+            expected_height = ratio*general_height
+            excessive_insertion = expected_height - smaller_dim
+            if centroid[0]<centx_max and centroid[0]>centx_min:
+                if centroid[1]<centy_max and centroid[1]>centy_min:
+                    if smaller_dim>expected_height-height_tol and smaller_dim<expected_height+height_tol:
+                        if np.mod(np.abs(angle),90)<max_angle:
+                            verification=1
         '''
         newmaskedimagegray = cv2.cvtColor(newmaskedimage, cv2.cv.CV_BGR2GRAY)
         cv_imshow(newmaskedimagegray)
