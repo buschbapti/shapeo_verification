@@ -5,10 +5,6 @@ from std_msgs.msg import Int32
 from shapeo_verification.srv import *
 import time
 
-obj_poses=[]
-obj_names = ['shapeoObj1']
-conf_thres = 0.005
-
 
 def verify_shapeo_call(shape_id):
     print('********************')
@@ -25,9 +21,9 @@ def verify_shapeo_call(shape_id):
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
     print('********************')
-    if verify_ret.data==0:
+    if verify_ret.shapeo_verified.data==0:
         print('failed')
-    elif verify_ret.data==1:
+    elif verify_ret.shapeo_verified.data==1:
         print('confirmed')
     
 if __name__ == '__main__':
