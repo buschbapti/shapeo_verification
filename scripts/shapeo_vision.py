@@ -17,13 +17,13 @@ from scipy import ndimage as nd
 
 MEAN_HUE = 26.0 #hues between MEAN_HUE-HUE_TOL will be accepted
 HUE_TOL  = 4.0
-BB_CUBE = [340,370,700,570] #Bbox for detecting the cube in the image.
+BB_CUBE = [350,150,900,470] #Bbox for detecting the cube in the image.
 centx_max = 450.0
 centx_min = 70.0
 centy_max = 350.0
 centy_min = 50.0
 general_width = 243.0
-general_height = 95.0
+general_height = 105.0
 height_tol = 15#all in pixels
 max_angle = 335#in angles
 DEBUGMOD = 0
