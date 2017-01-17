@@ -23,10 +23,10 @@ centx_min = 70.0
 centy_max = 350.0
 centy_min = 50.0
 general_width = 243.0
-general_height = 105.0
-height_tol = 15#all in pixels
+general_height = 110.0
+height_tol = 20#all in pixels
 max_angle = 335#in angles
-DEBUGMOD = 0
+DEBUGMOD = 1
 
 def get_rotation(shape_id):
     '''
